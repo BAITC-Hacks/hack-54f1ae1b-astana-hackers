@@ -1,10 +1,13 @@
-"""Claude function calling over the exact AgentTools used by ForecastFSM."""
+"""OpenAI or Claude function calling over the AgentTools used by ForecastFSM."""
 from __future__ import annotations
+import json
 import os
 import re
 import anthropic
+from openai import OpenAI
 import pandas as pd
 from .tools import load_tools
+from .llm import provider, openai_model
 
 TOOL_SCHEMAS = [
     {"name":"get_day_report", "description":"Retrieve a dated forecast and available actual error for one turbine.",
@@ -17,6 +20,27 @@ TOOL_SCHEMAS = [
      "input_schema":{"type":"object","properties":{"date":{"type":"string", "description":"Issue date; for an error on target day D use D+1, when actuals became known."},
                                                "site":{"type":"string","enum":["turbine_1","turbine_2"]}},
                      "required":["date"]}},
+]
+
+OPENAI_TOOLS = [
+    {"type": "function", "name": "get_day_report",
+     "description": "Retrieve the dated forecast and available actual error for a turbine.",
+     "strict": True,
+     "parameters": {"type": "object", "properties": {
+         "date": {"type": "string", "description": "Target date YYYY-MM-DD"},
+         "site": {"type": "string", "enum": ["turbine_1", "turbine_2"]}},
+         "required": ["date", "site"], "additionalProperties": False}},
+    {"type": "function", "name": "get_overall_metrics",
+     "description": "Retrieve measured January validation metrics; February actuals are unavailable.",
+     "strict": True,
+     "parameters": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}},
+    {"type": "function", "name": "get_agent_log",
+     "description": "Retrieve actual FSM decisions and analysis logs for an issue date and turbine. For a target-day error use the next issue date.",
+     "strict": True,
+     "parameters": {"type": "object", "properties": {
+         "date": {"type": "string", "description": "Issue date YYYY-MM-DD"},
+         "site": {"type": ["string", "null"], "enum": ["turbine_1", "turbine_2", None]}},
+         "required": ["date", "site"], "additionalProperties": False}},
 ]
 
 
@@ -68,22 +92,50 @@ def _fallback(question: str, tools) -> dict:
     return {"answer": spoken, "tool_calls": ["get_overall_metrics"]}
 
 
+def _openai_answer(question: str, mode: str, system: str) -> dict:
+    client = OpenAI()
+    messages = [{"role": "user", "content": question}]
+    called = []
+    for step in range(5):
+        response = client.responses.create(
+            model=openai_model(), instructions=system, input=messages,
+            tools=OPENAI_TOOLS, tool_choice="required" if step == 0 else "auto",
+            max_output_tokens=500, store=False)
+        calls = [item for item in response.output if item.type == "function_call"]
+        if not calls:
+            if not called:
+                raise RuntimeError("GPT did not call an AgentTools function")
+            return {"answer": response.output_text or "Нет текстового ответа модели.", "tool_calls": called}
+        messages.extend(item.model_dump(exclude_none=True) for item in response.output)
+        for call in calls:
+            args = json.loads(call.arguments)
+            selected_mode = "validation" if args.get("date", "2026-02-01") < "2026-02-01" else mode
+            value = _dispatch(load_tools(selected_mode), call.name, args)
+            called.append(call.name)
+            messages.append({"type": "function_call_output", "call_id": call.call_id,
+                             "output": json.dumps(value, ensure_ascii=False, default=str)})
+    return {"answer": "Достигнут предел вызовов инструментов.", "tool_calls": called}
+
+
 def answer(question: str, mode: str = "production") -> dict:
     if re.search(r"феврал|2026-02", question, re.I):
         mode = "production"
     elif re.search(r"январ|2026-01", question, re.I):
         mode = "validation"
     tools = load_tools(mode)
-    if not os.getenv("ANTHROPIC_API_KEY"):
+    selected = provider()
+    if selected == "none":
         return _fallback(question, tools)
-    client = anthropic.Anthropic()
-    messages = [{"role":"user", "content":question}]
-    called = []
     system = ("Ты помощник оператора ВЭС. Для каждого факта о прогнозе, ошибке или причине "
               "обязательно вызови инструмент. Не выдумывай февральский факт: он не дан. "
               "Для вопроса об ошибке целевого дня D смотри анализ в логе следующего дня D+1, когда стал известен факт. "
               "Если дата в январе, используй режим валидации; если в феврале — production. "
               "Отвечай по-русски кратко. Нормализованная мощность от 0 до 1.")
+    if selected == "openai":
+        return _openai_answer(question, mode, system)
+    client = anthropic.Anthropic()
+    messages = [{"role":"user", "content":question}]
+    called = []
     for _ in range(5):
         response = client.messages.create(model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6"),
                                           max_tokens=500, system=system, tools=TOOL_SCHEMAS, messages=messages)
