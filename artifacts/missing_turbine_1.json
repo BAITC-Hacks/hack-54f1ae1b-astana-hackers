@@ -1,0 +1,84 @@
+{
+  "site": "turbine_1",
+  "rows": 142360,
+  "expected_rows": 152352,
+  "missing_samples": 9992,
+  "missing_hours": 1665.33,
+  "short_gaps_1h_or_less": 37,
+  "medium_gaps_1h_to_24h": 26,
+  "long_gaps_24h_or_more": 4,
+  "largest_gaps": [
+    {
+      "start_local": "2024-05-18 03:50:00",
+      "end_local": "2024-06-28 18:30:00",
+      "samples": 5993,
+      "hours": 998.83
+    },
+    {
+      "start_local": "2024-06-28 23:10:00",
+      "end_local": "2024-07-17 17:10:00",
+      "samples": 2701,
+      "hours": 450.17
+    },
+    {
+      "start_local": "2025-10-03 10:50:00",
+      "end_local": "2025-10-05 13:50:00",
+      "samples": 307,
+      "hours": 51.17
+    },
+    {
+      "start_local": "2025-05-23 19:00:00",
+      "end_local": "2025-05-24 22:50:00",
+      "samples": 168,
+      "hours": 28.0
+    },
+    {
+      "start_local": "2023-10-07 08:30:00",
+      "end_local": "2023-10-07 20:00:00",
+      "samples": 70,
+      "hours": 11.67
+    },
+    {
+      "start_local": "2025-03-31 10:40:00",
+      "end_local": "2025-03-31 18:10:00",
+      "samples": 46,
+      "hours": 7.67
+    },
+    {
+      "start_local": "2024-10-15 10:20:00",
+      "end_local": "2024-10-15 17:40:00",
+      "samples": 45,
+      "hours": 7.5
+    },
+    {
+      "start_local": "2023-07-26 09:50:00",
+      "end_local": "2023-07-26 17:00:00",
+      "samples": 44,
+      "hours": 7.33
+    },
+    {
+      "start_local": "2025-04-08 10:40:00",
+      "end_local": "2025-04-08 17:50:00",
+      "samples": 44,
+      "hours": 7.33
+    },
+    {
+      "start_local": "2025-06-17 10:30:00",
+      "end_local": "2025-06-17 17:40:00",
+      "samples": 44,
+      "hours": 7.33
+    },
+    {
+      "start_local": "2025-02-28 10:40:00",
+      "end_local": "2025-02-28 16:20:00",
+      "samples": 35,
+      "hours": 5.83
+    },
+    {
+      "start_local": "2024-10-10 10:50:00",
+      "end_local": "2024-10-10 16:20:00",
+      "samples": 34,
+      "hours": 5.67
+    }
+  ]
+}

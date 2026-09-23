@@ -1,0 +1,28 @@
+{
+  "turbine_1": {
+    "n": 427,
+    "ml_mae": 0.16470828957469683,
+    "ml_rmse": 0.2329973308818221,
+    "ml_mape_pct": 65.66238718009176,
+    "baseline_mae": 0.15010144418423108,
+    "baseline_rmse": 0.22567706752472716,
+    "baseline_mape_pct": 66.85469917450789,
+    "mape_eligible_n": 287,
+    "wind_mae_ms": 2.001623731459797,
+    "wind_bias_ms": -1.1470101483216237,
+    "high_forecast_near_zero_actual_hours": 3
+  },
+  "turbine_2": {
+    "n": 427,
+    "ml_mae": 0.16799244508881217,
+    "ml_rmse": 0.24978520216746153,
+    "ml_mape_pct": 76.81579854275405,
+    "baseline_mae": 0.15559932344522512,
+    "baseline_rmse": 0.23517425756919613,
+    "baseline_mape_pct": 71.66684176221175,
+    "mape_eligible_n": 287,
+    "wind_mae_ms": 2.086412958626073,
+    "wind_bias_ms": -1.2402771272443405,
+    "high_forecast_near_zero_actual_hours": 4
+  }
+}
