@@ -27,7 +27,12 @@ ML-базовая система прогнозирования почасово
 - контроль полноты часа через число исходных измерений;
 - baseline-модель `PowerCurveRegressor` с биннингом скорости ветра по 1 м/с;
 - `RidgePowerRegressor` на признаках ветра, температуры, календаря, лагов и rolling-статистик;
+- LightGBM point model для нелинейной табличной регрессии;
+- три quantile-модели LightGBM для P10/P50/P90;
+- weighted ensemble из power curve, Ridge и LightGBM;
 - рекурсивный прогноз на 24 и 48 часов;
+- расчёт почасовой энергии в кВт·ч и МВт·ч при переданной установленной мощности;
+- единый runner `forecast_agent.py`: архивная погода → модели → интервалы → энергия;
 - walk-forward-валидация по дневным точкам прогноза;
 - расчёт MAE, RMSE и WMAPE;
 - сохранение результатов в JSON.
@@ -51,6 +56,7 @@ ML-базовая система прогнозирования почасово
 - **Python 3.10+**;
 - **pandas** — чтение CSV, временные ряды и агрегация;
 - **NumPy** — расчёт признаков и ridge-регрессии;
+- **LightGBM** — point и quantile regression;
 - **Python standard library** (`urllib`, `json`, `csv`, `hashlib`, `zoneinfo`) — загрузка и versioning архивных weather runs;
 - **JSON** — сохранение метрик;
 - **argparse** — интерфейс командной строки;
@@ -60,8 +66,11 @@ ML-базовая система прогнозирования почасово
 
 - `PowerCurveRegressor` — физически интерпретируемый baseline;
 - `RidgePowerRegressor` — регуляризованная линейная модель с нелинейными признаками скорости ветра.
+- `LightGBMRegressor` — градиентный boosting для point forecast;
+- `LightGBMRegressor(objective="quantile")` — P10/P50/P90;
+- weighted ensemble — итоговый прогноз из трёх компонент.
 
-В текущей версии не используются LightGBM, XGBoost, PyTorch или LLM API.
+XGBoost, PyTorch и LLM API в текущей версии не используются.
 
 Для архивных погодных прогнозов добавлен `weather_archive.py`, который использует Open-Meteo Single Runs API. LLM API не требуется.
 
@@ -89,6 +98,12 @@ weather_archive.py
        │
        ▼
 outputs/weather_archive/manifest.jsonl + runs/*/response.json + runs/*/forecast.csv
+       │
+       ▼
+forecast_agent.py
+       │
+       ▼
+outputs/forecast/forecast_*.csv + forecast_manifest.jsonl
 ```
 
 Главная логика находится в одном файле `ml_baseline.py`. Функции чтения и подготовки данных отделены от моделей, а функция оценки запускает одинаковую walk-forward-проверку для обеих моделей.
@@ -106,6 +121,7 @@ cd "C:\Users\user\Desktop\hackaton\hack-54f1ae1b-astana-hackers"
 ```powershell
 python -m pip install --upgrade pip
 python -m pip install pandas numpy
+python -m pip install -r requirements.txt
 ```
 
 Если используется конкретный интерпретатор Windows:
@@ -140,6 +156,18 @@ python -m pip install pandas numpy
   --horizon-hours 48 `
   --dry-run
 ```
+
+Полный сценарий с погодой, ансамблем, интервалами и энергией:
+
+```powershell
+& "C:\Python312\python.exe" ".\forecast_agent.py" `
+  --as-of "2026-01-31T00:00" `
+  --horizon-hours 48 `
+  --capacity-kw-turbine1 3000 `
+  --capacity-kw-turbine2 3000
+```
+
+Параметры `--capacity-kw-turbine1` и `--capacity-kw-turbine2` нужно заменить на фактическую установленную мощность турбин.
 
 Параметр `--cutoff` задаёт начало периода walk-forward-валидации. Значение по умолчанию — `2026-01-04 00:00:00`.
 
@@ -207,11 +235,10 @@ LLM-сервисы и deployed-инфраструктура в текущей в
 
 - нет agentic AI-цикла «получение погоды → подготовка → прогноз → анализ → повторный расчёт»;
 - валидация использует фактические исторические ветер и температуру, а не архивные прогнозы, доступные в прошлом;
-- нет отдельной модели LightGBM/XGBoost;
-- нет quantile-прогнозов P10/P50/P90 и доверительных интервалов;
-- нет полноценного ансамбля моделей;
-- `weather_archive.py` уже получает архивные weather runs, но автоматическая подача сохранённого `forecast.csv` в ML-прогноз пока не объединена в одну команду;
-- не рассчитывается абсолютная энергия в кВт·ч или МВт·ч, поскольку установленная мощность турбин не передана;
+- LightGBM требует установки зависимостей из `requirements.txt`; без него runner использует явно помеченный ridge fallback;
+- веса ensemble сейчас заданы конфигурационно и не подбираются автоматически по out-of-fold прогнозам;
+- архивные forecast snapshots сохраняются локально, но их жизненный цикл и удаление старых версий пока не автоматизированы;
+- абсолютная энергия рассчитывается только если пользователь передал фактическую установленную мощность турбины;
 - нет веб-интерфейса, планировщика и мониторинга качества в production;
 - рекурсивный прогноз ridge может накапливать ошибку на длинном горизонте.
 
